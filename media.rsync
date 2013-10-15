@@ -1,0 +1,47 @@
+#!/bin/bash
+
+MAILTO="root"
+
+DEST=$1
+if [ ! -z "$DEST" ]; then
+	SRC="/media/tank"
+
+	INCLUDELIST="/tmp/$$.includelist"
+	EXCLUDELIST="/tmp/$$.excludelist"
+	FILESFROM="/tmp/$$.filesfrom"
+	MERGEFILTER="/tmp/$$.mergefilter"
+
+	pushd $SRC >> /dev/null
+	# include movie folders modified in last 60days
+	find movies/* -maxdepth 1 -type d -mtime -60 > $INCLUDELIST
+	# excludes series files not modified in last 120days
+	find series -mtime +120 > $EXCLUDELIST
+	# -printf "%f\n" # -type f
+	popd >> /dev/null
+
+	cat <<-'EOF' > $FILESFROM
+		series/
+		music/
+		movies/
+	EOF
+
+	cat <<-'EOF' > $MERGEFILTER
+		+ /music/
+		+ /series/
+		+ /movies/
+		- /movies/*
+	EOF
+
+	RSYNC_OPS=(--recursive --perms --owner --group --times --inplace --delete --ignore-existing --delete-excluded --stats --human-readable) # --verbose --dry-run --checksum
+
+	RSYNC_RULES=(--include-from=$INCLUDELIST --exclude-from=$EXCLUDELIST --files-from=$FILESFROM --filter="merge $MERGEFILTER")
+
+	rsync "${RSYNC_OPS[@]}" "${RSYNC_RULES[@]}" $SRC $DEST
+
+	rm $INCLUDELIST
+	rm $EXCLUDELIST
+	rm $FILESFROM
+	rm $MERGEFILTER
+fi
+
+

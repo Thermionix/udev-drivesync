@@ -1,0 +1,103 @@
+#!/bin/bash
+# /usr/local/sbin/udev-drivesync
+# USAGE: udev-drivesync DEVICE
+#   DEVICE   is the new device node at /dev/DEVICE
+
+DEVICE=$1
+
+LOG_FILE=/var/log/drivesync.log
+exec > $LOG_FILE 2>&1
+echo "Begun udev-drivesync on: $(date +%Y%m%d) pid: $$"
+
+if [ -z "$DEVICE" ]; then
+	echo "No device provided to udev-drivesync"
+	exit 1
+fi
+
+command -v rsync > /dev/null || { echo "## please install rsync" ; exit 1 ; }
+command -v udisks > /dev/null || { echo "## please install udisks" ; exit 1 ; }
+
+DEV_ID=`blkid -c /dev/null -o value -s UUID /dev/$DEVICE`
+if [ -z "$DEV_ID" ]; then
+	echo "error: could not determine UUID for $DEVICE"
+	exit 1
+fi
+echo "info: USB Drive attached with uuid ${DEV_ID}"
+
+CONF_DIR="/etc/drivesync/"
+if [ ! -d "$CONF_DIR" ]; then
+	echo "error: ${CONF_DIR} missing"
+	exit 1
+fi
+
+pushd $CONF_DIR
+
+UUID_LIST="uuid.list"
+if [ ! -e "${UUID_LIST}" ]; then
+	echo "error: ${UUID_LIST} missing"
+	exit 1
+fi
+
+while IFS=, read uuid script
+do
+	if [ "$uuid" = "$DEV_ID" ]; then
+		echo "info: ${uuid} recognised, will exec ${script}"
+		DEV_SCRIPT=$script
+		break
+	fi
+done < $UUID_LIST
+
+if [ -z "${DEV_SCRIPT+x}" ]; then
+	echo "warning: drive ${DEV_ID} not recognised in ${UUID_LIST}"
+	echo "terminating process"
+	exit 0
+fi
+
+if ( grep -q ${DEVICE} /etc/mtab ); then
+	echo "error: seems /dev/${DEVICE} is already mounted"
+	exit 1
+fi
+
+DEV_FS=`blkid -c /dev/null -o value -s TYPE /dev/$DEVICE`
+if [ -z ${DEV_FS} ]; then
+	echo "error: /dev/${DEVICE} ${DEV_ID} fs_type empty!"
+	exit 1
+fi
+echo "info: ${DEV_ID} filesystem type is ${DEV_FS}"
+
+MNT="/media/${DEV_ID}"
+if [ -e "${MNT}" ]; then
+	echo "${MNT} already exists"
+	exit 1
+fi
+
+mkdir "${MNT}"
+
+mount /dev/${DEVICE} "${MNT}"
+
+sleep 5
+
+if ( grep -q ${DEVICE} /etc/mtab ); then
+	echo "info: ${DEV_ID} mounted at ${MNT}"
+
+	echo "info: source ${DEV_SCRIPT}"
+	source $DEV_SCRIPT $MNT
+
+	echo
+	df -h $MNT
+
+	echo
+	echo "info: umount ${MNT}"
+	umount -l $MNT
+	rmdir $MNT
+
+	PARENT_DEVICE=`echo ${DEVICE} | sed 's/[0-9]*//g'`
+	udisks --detach /dev/${PARENT_DEVICE}
+
+	if [ ! -z "$MAILTO" ]; then
+		cat $LOG_FILE | mail -s "${MNT} backup completed" $MAILTO
+	fi
+fi
+
+popd
+

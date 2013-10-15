@@ -1,0 +1,16 @@
+#!/bin/bash
+
+MAILTO="root"
+
+DEST=$1
+if [ ! -z "$DEST" ]; then
+	SRC="/media/tank"
+
+	RSYNC_OPS=(rsync --links --recursive --perms --owner --group --times --inplace --delete --ignore-existing --delete-excluded --stats --human-readable) # --verbose --dry-run
+
+	RSYNC_RULES=(--exclude='*.donotsync' --include='backups/')
+
+	rsync "${RSYNC_OPS[@]}" "${RSYNC_RULES[@]}" $SRC $DEST
+fi
+
+
