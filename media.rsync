@@ -4,7 +4,7 @@ MAILTO="root"
 
 DEST=$1
 if [ ! -z "$DEST" ]; then
-	SRC="/media/tank"
+	SRC="/media/fubox/tank"
 
 	INCLUDELIST="/tmp/$$.includelist"
 	EXCLUDELIST="/tmp/$$.excludelist"
@@ -13,9 +13,10 @@ if [ ! -z "$DEST" ]; then
 
 	pushd $SRC >> /dev/null
 	# include movie folders modified in last 60days
-	find movies/* -maxdepth 1 -type d -mtime -60 > $INCLUDELIST
+	find movies/* -maxdepth 1 -type d -mtime -25 > $INCLUDELIST
 	# excludes series files not modified in last 120days
-	find series -mtime +120 > $EXCLUDELIST
+	find series -mtime +120 ! -path "series/Game of Thrones/*" > $EXCLUDELIST
+
 	# -printf "%f\n" # -type f
 	popd >> /dev/null
 
@@ -23,6 +24,10 @@ if [ ! -z "$DEST" ]; then
 		series/
 		music/
 		movies/
+		misc/podcasts/
+		misc/yt-subs/
+		misc/defcon_archive/
+		misc/talks/
 	EOF
 
 	cat <<-'EOF' > $MERGEFILTER
