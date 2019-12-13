@@ -94,6 +94,7 @@ if ( grep -q ${DEVICE} /etc/mtab ); then
 	PARENT_DEVICE=`echo ${DEVICE} | sed 's/[0-9]*//g'`
 	#udisks --detach /dev/${PARENT_DEVICE}
 	#eject /dev/${PARENT_DEVICE}
+	#hdparm -Y /dev/${PARENT_DEVICE}
 
 	if [ ! -z "$MAILTO" ]; then
 		cat $LOG_FILE | mail -s "${MNT} backup completed" $MAILTO
